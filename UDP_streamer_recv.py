@@ -14,7 +14,19 @@ def main():
     __udp_client_socket.settimeout(5.0)  # Set a timeout for receiving data
     server_address = ('127.0.0.1', PORT)
 
+    # Send acknowledgment to the server
     __udp_client_socket.sendto(b'Client Request', server_address)
+
+    # Wait for server acknowledgment
+    while True:
+        try:
+            data, _ = __udp_client_socket.recvfrom(BUFFER_SIZE)
+            if data == b'ACK':
+                print("Server acknowledged, starting video reception.")
+                break
+        except socket.timeout:
+            print("Timeout: No ACK received. Resending request.")
+            __udp_client_socket.sendto(b'Client Request', server_address)
 
     expected_length = None
     received_data = bytearray()
@@ -22,7 +34,6 @@ def main():
     chunks_received = 0
     frame_count = 0
     total_latency = 0
-    start_time = time.time()
 
     while True:
         try:
@@ -70,10 +81,6 @@ def main():
             expected_length = None
             received_data = bytearray()
             chunks_received = 0
-
-    # Print final benchmarks
-    elapsed_time = time.time() - start_time
-    print(f"Total frames: {frame_count}, Average latency: {total_latency / frame_count:.4f} seconds, Elapsed time: {elapsed_time:.2f} seconds")
 
     cv2.destroyAllWindows()
     __udp_client_socket.close()

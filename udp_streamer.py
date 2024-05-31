@@ -23,6 +23,13 @@ def main():
     address = None
     last_received_time = time.time()
 
+    # Wait for acknowledgment from the client
+    print("Waiting for client acknowledgment...")
+    while address is None:
+        _, address = __udp_server_socket.recvfrom(BUFFER_SIZE)
+        __udp_server_socket.sendto(b'ACK', address)
+    print(f"Client acknowledged: {address}")
+
     while True:
         # Read a frame from the camera
         ret, frame = capture.read()
@@ -34,20 +41,16 @@ def main():
         timestamp = time.time()  # Add timestamp
         img_byte_array_with_length = struct.pack('dI', timestamp, arrlen) + img_byte_array
 
-        if address is None:
-            _, address = __udp_server_socket.recvfrom(BUFFER_SIZE)
-            last_received_time = time.time()
-
         try:
             # Split the data into smaller chunks and send them separately
             totalstepsrequired = 0
-            for i in range(0, len(img_byte_array), MAX_PACKET_SIZE):
+            for i in range(0, len(img_byte_array_with_length), MAX_PACKET_SIZE):
                 totalstepsrequired += 1
 
             count = 0
-            for i in range(0, len(img_byte_array), MAX_PACKET_SIZE):
+            for i in range(0, len(img_byte_array_with_length), MAX_PACKET_SIZE):
                 chunk = img_byte_array_with_length[i:i + MAX_PACKET_SIZE]
-                chunkwithcunkId = struct.pack('i', count) + struct.pack('i', totalstepsrequired) + chunk
+                chunkwithcunkId = struct.pack('ii', count, totalstepsrequired) + chunk
                 __udp_server_socket.sendto(chunkwithcunkId, address)
                 count += 1
         except socket.error as e:
@@ -58,8 +61,6 @@ def main():
             address = None
             last_received_time = time.time()
             continue
-
-        print(address)
 
         # Exit the loop if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
